@@ -194,7 +194,7 @@ class IndentToHeadingsSettingTab extends PluginSettingTab {
     return [
       {
         type: "group",
-        heading: "Indent to Headings",
+        heading: "Conversion",
         items: [
           {
             name: "Base heading level",
@@ -310,7 +310,7 @@ class IndentToHeadingsSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("Indent to Headings")
+      .setName("Conversion")
       .setHeading();
 
     this.addDropdownSetting(
@@ -370,7 +370,9 @@ class IndentToHeadingsSettingTab extends PluginSettingTab {
       .setName(name)
       .setDesc(desc)
       .addDropdown((dropdown) => {
-        Object.entries(options).forEach(([value, label]) => dropdown.addOption(value, label));
+        Object.entries(options).forEach(([value, label]) => {
+          dropdown.addOption(value, label);
+        });
         dropdown
           .setValue(String(this.getControlValue(key)))
           .onChange((value) => this.setControlValue(key, value));

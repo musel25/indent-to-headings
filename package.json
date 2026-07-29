@@ -1,6 +1,6 @@
 {
   "name": "indent-to-headings",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Convert plain indented outlines into Markdown headings in Obsidian.",
   "main": "main.js",
   "scripts": {
