@@ -1,0 +1,17 @@
+.indent-to-headings-preview {
+  display: grid;
+  gap: 12px;
+}
+
+.indent-to-headings-preview textarea {
+  font-family: var(--font-monospace);
+  min-height: 280px;
+  resize: vertical;
+  width: 100%;
+}
+
+.indent-to-headings-preview-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
