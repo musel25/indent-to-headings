@@ -8,6 +8,7 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
+  type SettingDefinitionItem,
 } from "obsidian";
 import {
   DEFAULT_SETTINGS,
@@ -22,6 +23,8 @@ interface TextTarget {
   from?: { line: number; ch: number };
   to?: { line: number; ch: number };
 }
+
+type SettingKey = Extract<keyof IndentToHeadingsSettings, string>;
 
 export default class IndentToHeadingsPlugin extends Plugin {
   settings: IndentToHeadingsSettings = DEFAULT_SETTINGS;
@@ -48,8 +51,8 @@ export default class IndentToHeadingsPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "preview-indent-to-headings-conversion",
-      name: "Preview indent to headings conversion",
+      id: "preview-conversion",
+      name: "Preview conversion",
       editorCallback: (editor) => this.previewConversion(editor),
     });
 
@@ -68,7 +71,8 @@ export default class IndentToHeadingsPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const savedSettings: unknown = await this.loadData();
+    this.settings = readSettings(savedSettings);
   }
 
   async saveSettings(): Promise<void> {
@@ -184,126 +188,201 @@ class IndentToHeadingsSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
+  getSettingDefinitions(): SettingDefinitionItem<SettingKey>[] {
+    return [
+      {
+        type: "group",
+        heading: "Indent to Headings",
+        items: [
+          {
+            name: "Base heading level",
+            desc: "Heading level used for unindented lines when no nearby heading exists.",
+            control: {
+              key: "baseHeadingLevel",
+              type: "dropdown",
+              defaultValue: String(DEFAULT_SETTINGS.baseHeadingLevel),
+              options: headingLevelOptions(),
+            },
+          },
+          {
+            name: "Spaces per indent",
+            desc: "Leading spaces are counted in groups of this size. Tabs always count as one indent.",
+            control: {
+              key: "spacesPerIndent",
+              type: "dropdown",
+              defaultValue: String(DEFAULT_SETTINGS.spacesPerIndent),
+              options: numberOptions([2, 3, 4]),
+            },
+          },
+          {
+            name: "Leaf lines as text",
+            desc: "Only lines with indented children become headings. Final child lines become body text.",
+            control: {
+              key: "leafLinesAsText",
+              type: "toggle",
+              defaultValue: DEFAULT_SETTINGS.leafLinesAsText,
+            },
+          },
+          {
+            name: "Minimum children for heading",
+            desc: "A plain line needs this many direct child lines before it becomes a heading.",
+            control: {
+              key: "minimumChildrenForHeading",
+              type: "dropdown",
+              defaultValue: String(DEFAULT_SETTINGS.minimumChildrenForHeading),
+              options: numberOptions([1, 2, 3]),
+            },
+          },
+          {
+            name: "Leaf text style",
+            desc: "How child lines with no children are written.",
+            control: {
+              key: "leafTextStyle",
+              type: "dropdown",
+              defaultValue: DEFAULT_SETTINGS.leafTextStyle,
+              options: {
+                plain: "Plain text",
+                bullet: "Bullets",
+              },
+            },
+          },
+          {
+            name: "Preserve leaf list markers",
+            desc: "Keep existing bullets, numbered markers, and task checkboxes on leaf lines.",
+            control: {
+              key: "preserveLeafListMarkers",
+              type: "toggle",
+              defaultValue: DEFAULT_SETTINGS.preserveLeafListMarkers,
+            },
+          },
+          {
+            name: "Strip list markers from headings",
+            desc: "Remove bullets, numbered-list markers, and task checkboxes before creating headings.",
+            control: {
+              key: "stripListMarkers",
+              type: "toggle",
+              defaultValue: DEFAULT_SETTINGS.stripListMarkers,
+            },
+          },
+          {
+            name: "Preserve blank lines",
+            desc: "Keep blank lines from the original outline.",
+            control: {
+              key: "preserveBlankLines",
+              type: "toggle",
+              defaultValue: DEFAULT_SETTINGS.preserveBlankLines,
+            },
+          },
+          {
+            name: "Prefer marked blocks",
+            desc: `When ${START_MARKER} and ${END_MARKER} exist, the main command only converts inside them.`,
+            control: {
+              key: "preferMarkedBlocks",
+              type: "toggle",
+              defaultValue: DEFAULT_SETTINGS.preferMarkedBlocks,
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  getControlValue(key: SettingKey): unknown {
+    switch (key) {
+      case "baseHeadingLevel":
+      case "spacesPerIndent":
+      case "minimumChildrenForHeading":
+        return String(this.plugin.settings[key]);
+      default:
+        return this.plugin.settings[key];
+    }
+  }
+
+  setControlValue(key: SettingKey, value: unknown): void {
+    applySettingValue(this.plugin.settings, key, value);
+    void this.plugin.saveSettings();
+  }
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Indent to Headings" });
-
     new Setting(containerEl)
-      .setName("Base heading level")
-      .setDesc("Heading level used for unindented lines when no nearby heading exists.")
+      .setName("Indent to Headings")
+      .setHeading();
+
+    this.addDropdownSetting(
+      "Base heading level",
+      "Heading level used for unindented lines when no nearby heading exists.",
+      "baseHeadingLevel",
+      headingLevelOptions()
+    );
+    this.addDropdownSetting(
+      "Spaces per indent",
+      "Leading spaces are counted in groups of this size. Tabs always count as one indent.",
+      "spacesPerIndent",
+      numberOptions([2, 3, 4])
+    );
+    this.addToggleSetting(
+      "Leaf lines as text",
+      "Only lines with indented children become headings. Final child lines become body text.",
+      "leafLinesAsText"
+    );
+    this.addDropdownSetting(
+      "Minimum children for heading",
+      "A plain line needs this many direct child lines before it becomes a heading.",
+      "minimumChildrenForHeading",
+      numberOptions([1, 2, 3])
+    );
+    this.addDropdownSetting(
+      "Leaf text style",
+      "How child lines with no children are written.",
+      "leafTextStyle",
+      { plain: "Plain text", bullet: "Bullets" }
+    );
+    this.addToggleSetting(
+      "Preserve leaf list markers",
+      "Keep existing bullets, numbered markers, and task checkboxes on leaf lines.",
+      "preserveLeafListMarkers"
+    );
+    this.addToggleSetting(
+      "Strip list markers from headings",
+      "Remove bullets, numbered-list markers, and task checkboxes before creating headings.",
+      "stripListMarkers"
+    );
+    this.addToggleSetting("Preserve blank lines", "Keep blank lines from the original outline.", "preserveBlankLines");
+    this.addToggleSetting(
+      "Prefer marked blocks",
+      `When ${START_MARKER} and ${END_MARKER} exist, the main command only converts inside them.`,
+      "preferMarkedBlocks"
+    );
+  }
+
+  private addDropdownSetting(
+    name: string,
+    desc: string,
+    key: SettingKey,
+    options: Record<string, string>
+  ): void {
+    new Setting(this.containerEl)
+      .setName(name)
+      .setDesc(desc)
       .addDropdown((dropdown) => {
-        for (let level = 1; level <= 6; level += 1) {
-          dropdown.addOption(String(level), `H${level}`);
-        }
-
+        Object.entries(options).forEach(([value, label]) => dropdown.addOption(value, label));
         dropdown
-          .setValue(String(this.plugin.settings.baseHeadingLevel))
-          .onChange(async (value) => {
-            this.plugin.settings.baseHeadingLevel = Number(value);
-            await this.plugin.saveSettings();
-          });
+          .setValue(String(this.getControlValue(key)))
+          .onChange((value) => this.setControlValue(key, value));
       });
+  }
 
-    new Setting(containerEl)
-      .setName("Spaces per indent")
-      .setDesc("Leading spaces are counted in groups of this size. Tabs always count as one indent.")
-      .addDropdown((dropdown) => {
-        [2, 3, 4].forEach((size) => dropdown.addOption(String(size), String(size)));
-        dropdown
-          .setValue(String(this.plugin.settings.spacesPerIndent))
-          .onChange(async (value) => {
-            this.plugin.settings.spacesPerIndent = Number(value);
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Leaf lines as text")
-      .setDesc("Only lines with indented children become headings. Final child lines become body text.")
+  private addToggleSetting(name: string, desc: string, key: SettingKey): void {
+    new Setting(this.containerEl)
+      .setName(name)
+      .setDesc(desc)
       .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.leafLinesAsText)
-          .onChange(async (value) => {
-            this.plugin.settings.leafLinesAsText = value;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Minimum children for heading")
-      .setDesc("A plain line needs this many direct child lines before it becomes a heading.")
-      .addDropdown((dropdown) => {
-        [1, 2, 3].forEach((count) => dropdown.addOption(String(count), String(count)));
-        dropdown
-          .setValue(String(this.plugin.settings.minimumChildrenForHeading))
-          .onChange(async (value) => {
-            this.plugin.settings.minimumChildrenForHeading = Number(value);
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Leaf text style")
-      .setDesc("How child lines with no children are written.")
-      .addDropdown((dropdown) => {
-        dropdown.addOption("plain", "Plain text");
-        dropdown.addOption("bullet", "Bullets");
-        dropdown
-          .setValue(this.plugin.settings.leafTextStyle)
-          .onChange(async (value) => {
-            this.plugin.settings.leafTextStyle = value as "plain" | "bullet";
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Preserve leaf list markers")
-      .setDesc("Keep existing bullets, numbered markers, and task checkboxes on leaf lines.")
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.preserveLeafListMarkers)
-          .onChange(async (value) => {
-            this.plugin.settings.preserveLeafListMarkers = value;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Strip list markers from headings")
-      .setDesc("Remove bullets, numbered-list markers, and task checkboxes before creating headings.")
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.stripListMarkers)
-          .onChange(async (value) => {
-            this.plugin.settings.stripListMarkers = value;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Preserve blank lines")
-      .setDesc("Keep blank lines from the original outline.")
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.preserveBlankLines)
-          .onChange(async (value) => {
-            this.plugin.settings.preserveBlankLines = value;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Prefer marked blocks")
-      .setDesc(`When ${START_MARKER} and ${END_MARKER} exist, the main command only converts inside them.`)
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.preferMarkedBlocks)
-          .onChange(async (value) => {
-            this.plugin.settings.preferMarkedBlocks = value;
-            await this.plugin.saveSettings();
-          });
+          .setValue(Boolean(this.getControlValue(key)))
+          .onChange((value) => this.setControlValue(key, value));
       });
   }
 }
@@ -318,6 +397,88 @@ function getSelectionOrFullNote(editor: Editor): TextTarget {
   }
 
   return { original: editor.getValue() };
+}
+
+function readSettings(value: unknown): IndentToHeadingsSettings {
+  if (!isRecord(value)) {
+    return { ...DEFAULT_SETTINGS };
+  }
+
+  return {
+    baseHeadingLevel: readNumber(value.baseHeadingLevel, DEFAULT_SETTINGS.baseHeadingLevel, [1, 2, 3, 4, 5, 6]),
+    spacesPerIndent: readNumber(value.spacesPerIndent, DEFAULT_SETTINGS.spacesPerIndent, [2, 3, 4]),
+    leafLinesAsText: readBoolean(value.leafLinesAsText, DEFAULT_SETTINGS.leafLinesAsText),
+    minimumChildrenForHeading: readNumber(
+      value.minimumChildrenForHeading,
+      DEFAULT_SETTINGS.minimumChildrenForHeading,
+      [1, 2, 3]
+    ),
+    stripListMarkers: readBoolean(value.stripListMarkers, DEFAULT_SETTINGS.stripListMarkers),
+    preserveLeafListMarkers: readBoolean(value.preserveLeafListMarkers, DEFAULT_SETTINGS.preserveLeafListMarkers),
+    leafTextStyle: value.leafTextStyle === "bullet" ? "bullet" : DEFAULT_SETTINGS.leafTextStyle,
+    preserveBlankLines: readBoolean(value.preserveBlankLines, DEFAULT_SETTINGS.preserveBlankLines),
+    preferMarkedBlocks: readBoolean(value.preferMarkedBlocks, DEFAULT_SETTINGS.preferMarkedBlocks),
+  };
+}
+
+function applySettingValue(settings: IndentToHeadingsSettings, key: SettingKey, value: unknown): void {
+  switch (key) {
+    case "baseHeadingLevel":
+      settings.baseHeadingLevel = readNumber(value, settings.baseHeadingLevel, [1, 2, 3, 4, 5, 6]);
+      return;
+    case "spacesPerIndent":
+      settings.spacesPerIndent = readNumber(value, settings.spacesPerIndent, [2, 3, 4]);
+      return;
+    case "minimumChildrenForHeading":
+      settings.minimumChildrenForHeading = readNumber(value, settings.minimumChildrenForHeading, [1, 2, 3]);
+      return;
+    case "leafLinesAsText":
+      settings.leafLinesAsText = readBoolean(value, settings.leafLinesAsText);
+      return;
+    case "stripListMarkers":
+      settings.stripListMarkers = readBoolean(value, settings.stripListMarkers);
+      return;
+    case "preserveLeafListMarkers":
+      settings.preserveLeafListMarkers = readBoolean(value, settings.preserveLeafListMarkers);
+      return;
+    case "leafTextStyle":
+      settings.leafTextStyle = value === "bullet" ? "bullet" : "plain";
+      return;
+    case "preserveBlankLines":
+      settings.preserveBlankLines = readBoolean(value, settings.preserveBlankLines);
+      return;
+    case "preferMarkedBlocks":
+      settings.preferMarkedBlocks = readBoolean(value, settings.preferMarkedBlocks);
+      return;
+  }
+}
+
+function headingLevelOptions(): Record<string, string> {
+  return {
+    "1": "H1",
+    "2": "H2",
+    "3": "H3",
+    "4": "H4",
+    "5": "H5",
+    "6": "H6",
+  };
+}
+
+function numberOptions(values: number[]): Record<string, string> {
+  return Object.fromEntries(values.map((value) => [String(value), String(value)]));
+}
+
+function readNumber(value: unknown, fallback: number, allowed: number[]): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return allowed.includes(parsed) ? parsed : fallback;
+}
+
+function readBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function getCurrentBlock(editor: Editor): TextTarget {
