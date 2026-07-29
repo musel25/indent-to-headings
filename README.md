@@ -100,3 +100,30 @@ npm test
 2. Run `npm version patch`, `npm version minor`, or `npm version major`.
 3. Push the commit and matching tag.
 4. The GitHub release workflow attaches `manifest.json`, `main.js`, and `styles.css`.
+
+## Community Directory Submission
+
+The repository is prepared for Obsidian Community plugin submission.
+
+Submit this repository URL:
+
+```txt
+https://github.com/musel25/indent-to-headings
+```
+
+Final submission must be completed by the repository owner because it requires signing in, linking GitHub, and accepting the Obsidian developer policies.
+
+1. Sign in to <https://community.obsidian.md>.
+2. Link the GitHub account that owns this repository.
+3. Open `Plugins` -> `New plugin`.
+4. Enter the repository URL above.
+5. Confirm the developer policies and submit.
+6. Address any automated review feedback.
+
+The current release is ready for review:
+
+- Root `README.md`, `LICENSE`, `manifest.json`, and `versions.json` exist.
+- `manifest.json.version` is `1.3.0`.
+- GitHub release `1.3.0` exists.
+- Release assets include `main.js`, `manifest.json`, and `styles.css`.
+- `versions.json` maps plugin version `1.3.0` to minimum Obsidian version `1.5.0`.
