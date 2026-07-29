@@ -152,7 +152,9 @@ class ConversionPreviewModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Preview conversion" });
+    new Setting(contentEl)
+      .setName("Preview conversion")
+      .setHeading();
 
     const wrapper = contentEl.createDiv({ cls: "indent-to-headings-preview" });
     wrapper.createEl("label", { text: "Before" });
